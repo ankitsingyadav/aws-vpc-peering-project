@@ -1,0 +1,57 @@
+# ============================================
+# AWS VPC Peering Project — .gitignore
+# ============================================
+
+# ---------- Terraform ----------
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+*.tfvars
+!terraform.tfvars.example
+
+# ---------- Terraform Plans ----------
+*.tfplan
+*.plan
+
+# ---------- AWS / Credentials ----------
+*.pem
+*.key
+*.ppk
+.env
+.env.*
+aws-credentials
+credentials
+.aws/
+
+# ---------- IDE ----------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ---------- OS ----------
+*.log
+*.tmp
+*.bak
+
+# ---------- Python (if using scripts) ----------
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.venv/
+
+# ---------- Screenshots (keep .gitkeep) ----------
+# screenshots/*.png
+# screenshots/*.jpg

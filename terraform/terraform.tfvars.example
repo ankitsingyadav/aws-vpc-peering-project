@@ -1,0 +1,24 @@
+#──────────────────────────────────────────────────────────────────────────────
+# terraform.tfvars.example – Sample variable values for the EWB VPC Peering Lab
+#
+# USAGE:
+#   1. Copy this file:  cp terraform.tfvars.example terraform.tfvars
+#   2. Edit terraform.tfvars and fill in your actual values.
+#   3. Run:  terraform init && terraform plan && terraform apply
+#──────────────────────────────────────────────────────────────────────────────
+
+# AWS region (default is ap-south-1 / Mumbai)
+aws_region = "ap-south-1"
+
+# Your name – used in resource tags for identification
+student_name = "Ankit Singh Yadav"
+
+# Your public IP in CIDR notation – allows SSH access to the bastion host.
+# Find your IP at https://checkip.amazonaws.com and append /32
+my_ip = "203.0.113.42/32"
+
+# Name of an existing EC2 key pair in the target region
+key_name = "ewb-lab"
+
+# Optional: override AMI ID. Leave empty ("") to auto-detect latest Amazon Linux 2023.
+# ami_id = "ami-0abcdef1234567890"
