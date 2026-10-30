@@ -336,8 +336,9 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 | Field       | Value                    |
 | ----------- | ------------------------ |
 | **Name**    | Ankit Singh Yadav        |
+| **GitHub**  | [@ankitsingyadav](https://github.com/ankitsingyadav) |
 | **Program** | EWB Cloud Labs           |
-| **Date**    | 2026                     |
+| **Date**    | October 2026             |
 
 ---
 
