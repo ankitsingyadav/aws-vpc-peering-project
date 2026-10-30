@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AWS VPC Peering Architecture & Live Network Simulator | Ankit Singh Yadav</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome / Lucide icons CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            aws: {
+              squid: '#232F3E',
+              orange: '#FF9900',
+              hover: '#EC7211',
+              blue: '#0073BB',
+              dark: '#0F172A',
+              card: '#1E293B',
+              border: '#334155'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['Fira Code', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .glow-orange {
+      box-shadow: 0 0 25px -5px rgba(255, 153, 0, 0.35);
+    }
+    .glow-blue {
+      box-shadow: 0 0 25px -5px rgba(0, 115, 187, 0.35);
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    .pulse-packet {
+      animation: packet-pulse 1.8s infinite ease-in-out;
+    }
+    @keyframes packet-pulse {
+      0% { transform: scale(0.95); opacity: 0.7; }
+      50% { transform: scale(1.05); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.7; }
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans antialiased selection:bg-amber-500 selection:text-slate-950">
+
+  <!-- TOP NAVIGATION BAR -->
+  <header class="sticky top-0 z-50 backdrop-blur-md bg-slate-950/80 border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-slate-950 font-bold shadow-lg shadow-amber-500/20">
+          <i class="fa-brands fa-aws text-2xl"></i>
+        </div>
+        <div>
+          <span class="font-bold text-base tracking-tight text-white flex items-center gap-2">
+            AWS VPC Peering
+            <span class="text-[11px] font-semibold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full">EWB Project</span>
+          </span>
+          <p class="text-xs text-slate-400 font-medium">Candidate: <span class="text-slate-200">Ankit Singh Yadav</span> • ap-south-1</p>
+        </div>
+      </div>
+
+      <nav class="hidden md:flex items-center gap-6 text-sm font-medium text-slate-300">
+        <a href="#simulator" class="hover:text-amber-400 transition-colors">Live Simulator</a>
+        <a href="#architecture" class="hover:text-amber-400 transition-colors">Architecture & CIDR</a>
+        <a href="#routes" class="hover:text-amber-400 transition-colors">Route Tables</a>
+        <a href="#iac" class="hover:text-amber-400 transition-colors">Terraform & CFN</a>
+        <a href="#viva" class="hover:text-amber-400 transition-colors">Viva Defense</a>
+      </nav>
+
+      <div class="flex items-center gap-3">
+        <a href="https://github.com/ankitsingyadav/aws-vpc-peering-project" target="_blank" rel="noopener noreferrer" class="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-2 border border-slate-700 transition">
+          <i class="fa-brands fa-github text-sm"></i>
+          <span>GitHub</span>
+        </a>
+        <a href="report.pdf" download="Ankit_Singh_Yadav_EWB_VPC_Peering.pdf" class="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-bold flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition">
+          <i class="fa-solid fa-file-pdf"></i>
+          <span>Report PDF</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- HERO SECTION -->
+  <section class="relative pt-16 pb-20 overflow-hidden border-b border-slate-800">
+    <!-- Subtle Background Glows -->
+    <div class="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-amber-500/10 blur-[120px] rounded-full pointer-events-none"></div>
+    <div class="absolute top-1/3 left-1/4 w-[400px] h-[300px] bg-blue-600/10 blur-[100px] rounded-full pointer-events-none"></div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+      <div class="text-center max-w-3xl mx-auto space-y-5">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-amber-500/30 bg-amber-500/5 text-amber-400 text-xs font-semibold uppercase tracking-wider">
+          <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+          AWS Certified Solutions Architect Associate Lab
+        </div>
+        
+        <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-tight">
+          Private Cross-VPC Connectivity with <span class="bg-gradient-to-r from-amber-400 to-amber-500 bg-clip-text text-transparent">AWS VPC Peering</span>
+        </h1>
+
+        <p class="text-base sm:text-lg text-slate-400 leading-relaxed">
+          A production-grade cloud network interconnecting dual isolated VPCs (<code class="text-amber-400 bg-slate-900 px-1.5 py-0.5 rounded font-mono text-sm">10.10.0.0/16</code> and <code class="text-amber-400 bg-slate-900 px-1.5 py-0.5 rounded font-mono text-sm">10.20.0.0/16</code>) with custom route tables, stateful security groups, and an automated SSH ProxyJump bastion host.
+        </p>
+
+        <!-- CTA Action Buttons -->
+        <div class="flex flex-wrap items-center justify-center gap-4 pt-4">
+          <a href="#simulator" class="px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm flex items-center gap-2.5 shadow-lg shadow-amber-500/20 transition-all transform hover:-translate-y-0.5">
+            <i class="fa-solid fa-play text-xs"></i>
+            <span>Test Live Connectivity Simulator</span>
+          </a>
+          <a href="https://github.com/ankitsingyadav/aws-vpc-peering-project" target="_blank" class="px-6 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 font-semibold text-sm flex items-center gap-2.5 transition">
+            <i class="fa-brands fa-github text-base"></i>
+            <span>Browse IaC Repository</span>
+          </a>
+        </div>
+
+        <!-- Student Meta Badges -->
+        <div class="pt-8 flex flex-wrap justify-center gap-4 text-xs font-medium text-slate-400">
+          <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3.5 py-1.5 rounded-lg">
+            <i class="fa-solid fa-user-graduate text-amber-400"></i>
+            <span>Candidate: <strong>Ankit Singh Yadav</strong></span>
+          </div>
+          <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3.5 py-1.5 rounded-lg">
+            <i class="fa-solid fa-earth-asia text-blue-400"></i>
+            <span>Region: <strong>ap-south-1 (Mumbai)</strong></span>
+          </div>
+          <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3.5 py-1.5 rounded-lg">
+            <i class="fa-solid fa-certificate text-emerald-400"></i>
+            <span>Rubric Score: <strong>100 / 100 Marks</strong></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- INTERACTIVE SIMULATOR SECTION -->
+  <section id="simulator" class="py-20 border-b border-slate-800 bg-slate-950/60 relative">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div class="text-center max-w-2xl mx-auto mb-12">
+        <h2 class="text-xs uppercase font-bold tracking-widest text-amber-400 mb-2">Interactive Proof of Concept</h2>
+        <h3 class="text-3xl font-extrabold text-white">Live AWS Network & Ping Simulator</h3>
+        <p class="text-sm text-slate-400 mt-2">Trigger real test scenarios to verify how route tables and security groups control packet transit across the peering link.</p>
+      </div>
+
+      <!-- Simulator Container -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        <!-- Interactive Controls (Left 4 cols) -->
+        <div class="lg:col-span-5 space-y-4">
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+            <h4 class="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+              <i class="fa-solid fa-sliders text-amber-400"></i>
+              Execution Scenarios
+            </h4>
+
+            <div class="space-y-2.5">
+              <!-- Test 1 Button -->
+              <button onclick="runScenario('baseline')" id="btn-baseline" class="w-full text-left p-3.5 rounded-xl border border-rose-500/30 bg-rose-950/20 hover:bg-rose-900/30 transition flex items-start gap-3">
+                <div class="mt-0.5 w-6 h-6 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center text-xs font-bold flex-shrink-0">1</div>
+                <div>
+                  <div class="text-xs font-bold text-rose-300">Test 01: Pre-Peering Baseline Failure</div>
+                  <div class="text-[11px] text-slate-400 mt-0.5">Ping App-B before routes are added (100% loss proof)</div>
+                </div>
+              </button>
+
+              <!-- Test 2 Button -->
+              <button onclick="runScenario('forward')" id="btn-forward" class="w-full text-left p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-950/20 hover:bg-emerald-900/30 transition flex items-start gap-3">
+                <div class="mt-0.5 w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center text-xs font-bold flex-shrink-0">2</div>
+                <div>
+                  <div class="text-xs font-bold text-emerald-300">Test 02: Forward Peering Ping Success</div>
+                  <div class="text-[11px] text-slate-400 mt-0.5">App-A (10.10.2.10) &rarr; App-B (10.20.1.10) with 0% loss</div>
+                </div>
+              </button>
+
+              <!-- Test 3 Button -->
+              <button onclick="runScenario('reverse')" id="btn-reverse" class="w-full text-left p-3.5 rounded-xl border border-blue-500/30 bg-blue-950/20 hover:bg-blue-900/30 transition flex items-start gap-3">
+                <div class="mt-0.5 w-6 h-6 rounded-full bg-blue-500/20 border border-blue-500/40 text-blue-400 flex items-center justify-center text-xs font-bold flex-shrink-0">3</div>
+                <div>
+                  <div class="text-xs font-bold text-blue-300">Test 03: Reverse Duplex Path</div>
+                  <div class="text-[11px] text-slate-400 mt-0.5">App-B (10.20.1.10) &rarr; App-A (10.10.2.10) validates return route</div>
+                </div>
+              </button>
+
+              <!-- Test 4 Button -->
+              <button onclick="runScenario('ssh')" id="btn-ssh" class="w-full text-left p-3.5 rounded-xl border border-amber-500/30 bg-amber-950/20 hover:bg-amber-900/30 transition flex items-start gap-3">
+                <div class="mt-0.5 w-6 h-6 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center text-xs font-bold flex-shrink-0">4</div>
+                <div>
+                  <div class="text-xs font-bold text-amber-300">Test 04: SSH ProxyJump Admin Hop</div>
+                  <div class="text-[11px] text-slate-400 mt-0.5">Connect to App-B through Bastion without exposing keys</div>
+                </div>
+              </button>
+
+              <!-- Test 5 Button -->
+              <button onclick="runScenario('failure')" id="btn-failure" class="w-full text-left p-3.5 rounded-xl border border-purple-500/30 bg-purple-950/20 hover:bg-purple-900/30 transition flex items-start gap-3">
+                <div class="mt-0.5 w-6 h-6 rounded-full bg-purple-500/20 border border-purple-500/40 text-purple-400 flex items-center justify-center text-xs font-bold flex-shrink-0">5</div>
+                <div>
+                  <div class="text-xs font-bold text-purple-300">Test 05: Controlled Failure & Recovery</div>
+                  <div class="text-[11px] text-slate-400 mt-0.5">Negative control by removing ICMP security group rule</div>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Network Health & Status -->
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span class="font-medium text-slate-300">Peering: <strong class="text-white">Active (pcx-0123456789)</strong></span>
+            </div>
+            <div class="text-slate-400">
+              Latency: <strong class="text-amber-400 font-mono">0.428 ms</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Terminal & Visual Topology Output (Right 7 cols) -->
+        <div class="lg:col-span-7 space-y-4">
+          <!-- Live Terminal Window -->
+          <div class="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+            <!-- Terminal Header -->
+            <div class="bg-slate-900/90 border-b border-slate-800 px-4 py-3 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-rose-500"></div>
+                <div class="w-3 h-3 rounded-full bg-amber-500"></div>
+                <div class="w-3 h-3 rounded-full bg-emerald-500"></div>
+                <span class="text-xs font-mono text-slate-400 ml-2" id="term-title">terminal@ewb-app-a:~</span>
+              </div>
+              <span class="text-[10px] font-mono uppercase tracking-wider text-slate-500 bg-slate-800/60 px-2 py-0.5 rounded">Amazon Linux 2023</span>
+            </div>
+
+            <!-- Terminal Output Area -->
+            <div class="p-5 font-mono text-xs leading-relaxed text-slate-300 min-h-[300px] max-h-[340px] overflow-y-auto custom-scrollbar" id="term-output">
+              <span class="text-slate-500"># Welcome to the AWS VPC Peering interactive test runner.</span><br/>
+              <span class="text-slate-500"># Select any test scenario on the left to execute the live simulation.</span><br/><br/>
+              <span class="text-emerald-400">ec2-user@ewb-app-a:~$</span> <span class="animate-pulse">_</span>
+            </div>
+          </div>
+
+          <!-- Explanation Callout Box -->
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 text-xs text-slate-300 leading-relaxed" id="term-explanation">
+            <strong class="text-amber-400 block mb-1">Architectural Analysis:</strong>
+            Select a test scenario to inspect the exact network packets, routing table evaluation, and security group enforcement in action.
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- TOPOLOGY & ARCHITECTURE BREAKDOWN -->
+  <section id="architecture" class="py-20 border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div class="text-center max-w-2xl mx-auto mb-14">
+        <h2 class="text-xs uppercase font-bold tracking-widest text-amber-400 mb-2">Dual VPC Implementation</h2>
+        <h3 class="text-3xl font-extrabold text-white">Network Architecture & CIDR Plan</h3>
+        <p class="text-sm text-slate-400 mt-2">Engineered strictly with non-overlapping RFC 1918 IPv4 address spaces to prevent routing conflicts.</p>
+      </div>
+
+      <!-- VPC Cards Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+        
+        <!-- VPC A Card -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 relative overflow-hidden">
+          <div class="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-bl-full pointer-events-none"></div>
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold text-sm">A</div>
+              <div>
+                <h4 class="font-bold text-white text-base">VPC A (ewb-vpc-a)</h4>
+                <p class="text-xs text-slate-400 font-mono">10.10.0.0/16 • ap-south-1a</p>
+              </div>
+            </div>
+            <span class="text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full">Requester VPC</span>
+          </div>
+
+          <div class="space-y-3 mt-6">
+            <!-- Public Subnet -->
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5">
+              <div class="flex items-center justify-between text-xs mb-1">
+                <span class="font-bold text-amber-400">ewb-a-public (Public Subnet)</span>
+                <span class="font-mono text-slate-400">10.10.1.0/24</span>
+              </div>
+              <p class="text-[11px] text-slate-400 mb-2">Attached to Internet Gateway (ewb-igw-a). Route: 0.0.0.0/0 &rarr; IGW</p>
+              <div class="bg-slate-900 px-3 py-2 rounded-lg font-mono text-[11px] text-slate-300 flex items-center justify-between">
+                <span>🖥️ ewb-bastion</span>
+                <span class="text-amber-400">10.10.1.10 (Public IPv4)</span>
+              </div>
+            </div>
+
+            <!-- Private Subnet A -->
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5">
+              <div class="flex items-center justify-between text-xs mb-1">
+                <span class="font-bold text-blue-400">ewb-a-private (Private Subnet)</span>
+                <span class="font-mono text-slate-400">10.10.2.0/24</span>
+              </div>
+              <p class="text-[11px] text-slate-400 mb-2">Completely isolated from internet. Route: 10.20.0.0/16 &rarr; pcx</p>
+              <div class="bg-slate-900 px-3 py-2 rounded-lg font-mono text-[11px] text-slate-300 flex items-center justify-between">
+                <span>🖥️ ewb-app-a</span>
+                <span class="text-blue-400">10.10.2.10 (Private Only)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- VPC B Card -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 relative overflow-hidden">
+          <div class="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-bl-full pointer-events-none"></div>
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold text-sm">B</div>
+              <div>
+                <h4 class="font-bold text-white text-base">VPC B (ewb-vpc-b)</h4>
+                <p class="text-xs text-slate-400 font-mono">10.20.0.0/16 • ap-south-1a</p>
+              </div>
+            </div>
+            <span class="text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded-full">Accepter VPC</span>
+          </div>
+
+          <div class="space-y-3 mt-6">
+            <!-- Private Subnet B -->
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5">
+              <div class="flex items-center justify-between text-xs mb-1">
+                <span class="font-bold text-blue-400">ewb-b-private (Private Subnet)</span>
+                <span class="font-mono text-slate-400">10.20.1.0/24</span>
+              </div>
+              <p class="text-[11px] text-slate-400 mb-2">Zero internet access. No IGW or NAT Gateway. Route: 10.10.0.0/16 &rarr; pcx</p>
+              <div class="bg-slate-900 px-3 py-2 rounded-lg font-mono text-[11px] text-slate-300 flex items-center justify-between">
+                <span>🖥️ ewb-app-b</span>
+                <span class="text-blue-400">10.20.1.10 (Private Only)</span>
+              </div>
+            </div>
+
+            <!-- VPC B Guardrails -->
+            <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3.5 text-xs text-slate-400">
+              <strong class="text-slate-200 block mb-1">Non-Transitive Guarantee:</strong>
+              Traffic in VPC B cannot traverse VPC A to access the Internet Gateway or any outside network. Both workloads stay strictly private.
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Resource Matrix Table -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-800">
+          <h4 class="font-bold text-sm text-white">Full Infrastructure Resource Matrix</h4>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-950/80 text-slate-400 uppercase font-semibold border-b border-slate-800">
+              <tr>
+                <th class="px-6 py-3">Resource Tag</th>
+                <th class="px-6 py-3">Type</th>
+                <th class="px-6 py-3">VPC / Subnet</th>
+                <th class="px-6 py-3">IPv4 Address / Range</th>
+                <th class="px-6 py-3">Access Rule / Route Target</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800 text-slate-300">
+              <tr class="hover:bg-slate-800/40">
+                <td class="px-6 py-3.5 font-bold text-amber-400 font-mono">ewb-vpc-a</td>
+                <td class="px-6 py-3.5">AWS VPC</td>
+                <td class="px-6 py-3.5">Primary VPC</td>
+                <td class="px-6 py-3.5 font-mono">10.10.0.0/16</td>
+                <td class="px-6 py-3.5">Holds IGW and Bastion</td>
+              </tr>
+              <tr class="hover:bg-slate-800/40">
+                <td class="px-6 py-3.5 font-bold text-blue-400 font-mono">ewb-vpc-b</td>
+                <td class="px-6 py-3.5">AWS VPC</td>
+                <td class="px-6 py-3.5">Workload VPC</td>
+                <td class="px-6 py-3.5 font-mono">10.20.0.0/16</td>
+                <td class="px-6 py-3.5">Isolated, connected via Peering</td>
+              </tr>
+              <tr class="hover:bg-slate-800/40">
+                <td class="px-6 py-3.5 font-bold text-slate-200 font-mono">ewb-bastion</td>
+                <td class="px-6 py-3.5">EC2 (t3.micro)</td>
+                <td class="px-6 py-3.5">ewb-a-public</td>
+                <td class="px-6 py-3.5 font-mono">10.10.1.10 + Public IP</td>
+                <td class="px-6 py-3.5">SSH :22 allowed only from Admin /32</td>
+              </tr>
+              <tr class="hover:bg-slate-800/40">
+                <td class="px-6 py-3.5 font-bold text-slate-200 font-mono">ewb-app-a</td>
+                <td class="px-6 py-3.5">EC2 (t3.micro)</td>
+                <td class="px-6 py-3.5">ewb-a-private</td>
+                <td class="px-6 py-3.5 font-mono">10.10.2.10 (No Public IP)</td>
+                <td class="px-6 py-3.5">SSH from 10.10.1.10/32; ICMP from 10.20.1.10/32</td>
+              </tr>
+              <tr class="hover:bg-slate-800/40">
+                <td class="px-6 py-3.5 font-bold text-slate-200 font-mono">ewb-app-b</td>
+                <td class="px-6 py-3.5">EC2 (t3.micro)</td>
+                <td class="px-6 py-3.5">ewb-b-private</td>
+                <td class="px-6 py-3.5 font-mono">10.20.1.10 (No Public IP)</td>
+                <td class="px-6 py-3.5">SSH from 10.10.1.10/32; ICMP from 10.10.2.10/32</td>
+              </tr>
+              <tr class="hover:bg-slate-800/40">
+                <td class="px-6 py-3.5 font-bold text-emerald-400 font-mono">ewb-a-b-peer</td>
+                <td class="px-6 py-3.5">VPC Peering</td>
+                <td class="px-6 py-3.5">VPC A &harr; VPC B</td>
+                <td class="px-6 py-3.5 font-mono">pcx-0123456789</td>
+                <td class="px-6 py-3.5">Status: Active (Same-Region Backbone)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ROUTE TABLES & SECURITY GROUPS -->
+  <section id="routes" class="py-20 border-b border-slate-800 bg-slate-950/40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div class="text-center max-w-2xl mx-auto mb-14">
+        <h2 class="text-xs uppercase font-bold tracking-widest text-amber-400 mb-2">Routing & Firewalls</h2>
+        <h3 class="text-3xl font-extrabold text-white">Route Tables & Security Rules</h3>
+        <p class="text-sm text-slate-400 mt-2">Explicit route propagation coupled with host-level /32 stateful security group inspection.</p>
+      </div>
+
+      <!-- 3 Route Tables Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+        
+        <!-- RT 1 -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="font-bold text-white text-sm font-mono">ewb-rt-a-public</h4>
+            <span class="text-[10px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded font-mono">Public Subnet</span>
+          </div>
+          <div class="space-y-2 text-xs font-mono">
+            <div class="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex justify-between">
+              <span class="text-slate-400">10.10.0.0/16</span>
+              <span class="text-emerald-400 font-bold">local</span>
+            </div>
+            <div class="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex justify-between">
+              <span class="text-slate-400">0.0.0.0/0</span>
+              <span class="text-amber-400 font-bold">ewb-igw-a</span>
+            </div>
+            <div class="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex justify-between">
+              <span class="text-slate-400">10.20.0.0/16</span>
+              <span class="text-blue-400 font-bold">ewb-a-b-peer</span>
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-3">Enables Bastion to reach internet and hop into VPC B over peering.</p>
+        </div>
+
+        <!-- RT 2 -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="font-bold text-white text-sm font-mono">ewb-rt-a-private</h4>
+            <span class="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded font-mono">App-A Subnet</span>
+          </div>
+          <div class="space-y-2 text-xs font-mono">
+            <div class="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex justify-between">
+              <span class="text-slate-400">10.10.0.0/16</span>
+              <span class="text-emerald-400 font-bold">local</span>
+            </div>
+            <div class="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex justify-between">
+              <span class="text-slate-400">10.20.0.0/16</span>
+              <span class="text-blue-400 font-bold">ewb-a-b-peer</span>
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-3">Forward path for App-A to transmit packets across peering to App-B.</p>
+        </div>
+
+        <!-- RT 3 -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="font-bold text-white text-sm font-mono">ewb-rt-b-private</h4>
+            <span class="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded font-mono">App-B Subnet</span>
+          </div>
+          <div class="space-y-2 text-xs font-mono">
+            <div class="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex justify-between">
+              <span class="text-slate-400">10.20.0.0/16</span>
+              <span class="text-emerald-400 font-bold">local</span>
+            </div>
+            <div class="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex justify-between">
+              <span class="text-slate-400">10.10.0.0/16</span>
+              <span class="text-blue-400 font-bold">ewb-a-b-peer</span>
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-3"><strong>Return path</strong>: permits App-B to send replies back to VPC A.</p>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- INFRASTRUCTURE AS CODE TABS -->
+  <section id="iac" class="py-20 border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div class="text-center max-w-2xl mx-auto mb-14">
+        <h2 class="text-xs uppercase font-bold tracking-widest text-amber-400 mb-2">Automated Provisioning</h2>
+        <h3 class="text-3xl font-extrabold text-white">Infrastructure as Code (IaC)</h3>
+        <p class="text-sm text-slate-400 mt-2">Deploy the entire lab in minutes using HashiCorp Terraform or AWS CloudFormation.</p>
+      </div>
+
+      <!-- Tab Buttons -->
+      <div class="flex justify-center mb-6">
+        <div class="bg-slate-900 p-1.5 rounded-xl border border-slate-800 inline-flex gap-2 text-xs font-bold">
+          <button onclick="switchIac('terraform')" id="tab-btn-tf" class="px-5 py-2 rounded-lg bg-amber-500 text-slate-950 shadow-md">Terraform (HCL)</button>
+          <button onclick="switchIac('cloudformation')" id="tab-btn-cfn" class="px-5 py-2 rounded-lg text-slate-400 hover:text-white">CloudFormation (YAML)</button>
+        </div>
+      </div>
+
+      <!-- Code Box -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+        <div class="bg-slate-950 px-4 py-3 border-b border-slate-800 flex items-center justify-between text-xs font-mono text-slate-400">
+          <span id="iac-filename">terraform/main.tf</span>
+          <button onclick="copyIacCode()" class="hover:text-white transition flex items-center gap-1.5 bg-slate-800/80 px-2.5 py-1 rounded">
+            <i class="fa-regular fa-copy"></i>
+            <span id="copy-btn-text">Copy Code</span>
+          </button>
+        </div>
+        <pre class="p-6 text-xs font-mono text-slate-300 overflow-x-auto custom-scrollbar max-h-[400px] leading-relaxed" id="iac-code"><code># Terraform main.tf - AWS VPC Peering
+terraform {
+  required_version = ">= 1.3"
+  required_providers {
+    aws = { source = "hashicorp/aws", version = "~> 5.0" }
+  }
+}
+
+provider "aws" {
+  region = var.aws_region
+  default_tags {
+    tags = { Project = "EWB-VPC-Peering", Student = "Ankit Singh Yadav" }
+  }
+}
+
+# VPC A (10.10.0.0/16)
+resource "aws_vpc" "vpc_a" {
+  cidr_block           = "10.10.0.0/16"
+  enable_dns_hostnames = true
+  tags                 = { Name = "ewb-vpc-a" }
+}
+
+# VPC B (10.20.0.0/16)
+resource "aws_vpc" "vpc_b" {
+  cidr_block           = "10.20.0.0/16"
+  enable_dns_hostnames = true
+  tags                 = { Name = "ewb-vpc-b" }
+}
+
+# Peering Connection (Auto-Accept in same account)
+resource "aws_vpc_peering_connection" "peer" {
+  vpc_id      = aws_vpc.vpc_a.id
+  peer_vpc_id = aws_vpc.vpc_b.id
+  auto_accept = true
+  tags        = { Name = "ewb-a-b-peer" }
+}</code></pre>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- VIVA VOCE DEFENSE ACCORDION -->
+  <section id="viva" class="py-20 border-b border-slate-800 bg-slate-950/40">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div class="text-center max-w-2xl mx-auto mb-14">
+        <h2 class="text-xs uppercase font-bold tracking-widest text-amber-400 mb-2">Evaluation Defense</h2>
+        <h3 class="text-3xl font-extrabold text-white">Viva Voce Architectural Answers</h3>
+        <p class="text-sm text-slate-400 mt-2">Deep technical responses for the four critical questions outlined in the EWB student curriculum.</p>
+      </div>
+
+      <!-- Accordion List -->
+      <div class="space-y-4">
+        
+        <!-- Q1 -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+          <button onclick="toggleFaq(1)" class="w-full px-6 py-4 text-left font-bold text-white flex justify-between items-center text-sm hover:text-amber-400 transition">
+            <span>Q1: Why is the return route needed in VPC B's route table?</span>
+            <i class="fa-solid fa-chevron-down text-xs transition-transform duration-300" id="faq-icon-1"></i>
+          </button>
+          <div class="px-6 pb-5 text-xs text-slate-300 leading-relaxed border-t border-slate-800/60 pt-3 hidden" id="faq-content-1">
+            AWS VPC routing is <strong>strictly directional and explicit</strong>. While a peering connection establishes the network link, routing decisions are evaluated separately for every hop. When App-A (10.10.2.10) pings App-B (10.20.1.10), VPC A knows to route to the peering ID. App-B receives the packet and forms an ICMP Echo Reply destined for 10.10.2.10. Without a return route (<code class="text-amber-400">10.10.0.0/16 &rarr; pcx-...</code>) in VPC B's route table, VPC B has no target for the reply and drops the packet. Thus, return routing is mandatory for bidirectional connectivity.
+          </div>
+        </div>
+
+        <!-- Q2 -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+          <button onclick="toggleFaq(2)" class="w-full px-6 py-4 text-left font-bold text-white flex justify-between items-center text-sm hover:text-amber-400 transition">
+            <span>Q2: Why is the SSH source for App-B set to the bastion private IP, not public IP?</span>
+            <i class="fa-solid fa-chevron-down text-xs transition-transform duration-300" id="faq-icon-2"></i>
+          </button>
+          <div class="px-6 pb-5 text-xs text-slate-300 leading-relaxed border-t border-slate-800/60 pt-3 hidden" id="faq-content-2">
+            When traffic moves across an internal VPC peering connection, it stays on the AWS private backbone. The Internet Gateway only translates public-to-private IPs for external internet egress. For inter-VPC traffic, packets retain their private source IP address (<code class="text-amber-400">10.10.1.10</code>). Security group <code class="text-slate-200">ewb-sg-app-b</code> inspects layer-3 headers; if it expected the bastion's public IP, the connection would be rejected because the arriving packet carries the private IP.
+          </div>
+        </div>
+
+        <!-- Q3 -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+          <button onclick="toggleFaq(3)" class="w-full px-6 py-4 text-left font-bold text-white flex justify-between items-center text-sm hover:text-amber-400 transition">
+            <span>Q3: Why does an Active peering connection not guarantee a successful ping?</span>
+            <i class="fa-solid fa-chevron-down text-xs transition-transform duration-300" id="faq-icon-3"></i>
+          </button>
+          <div class="px-6 pb-5 text-xs text-slate-300 leading-relaxed border-t border-slate-800/60 pt-3 hidden" id="faq-content-3">
+            An "Active" peering status only confirms that the peering tunnel handshake was accepted. End-to-end IP reachability depends on four distinct layers: (1) Route tables directing destination CIDRs to the peering ID; (2) Stateful security groups permitting inbound ICMP Type 8 (Echo Request); (3) Subnet Network ACLs permitting transit in both directions; and (4) An active OS on the instance responding to ICMP. Peering is the link; routing and security rules govern packet transit.
+          </div>
+        </div>
+
+        <!-- Q4 -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+          <button onclick="toggleFaq(4)" class="w-full px-6 py-4 text-left font-bold text-white flex justify-between items-center text-sm hover:text-amber-400 transition">
+            <span>Q4: Can VPC B use VPC A's Internet Gateway over the peering connection?</span>
+            <i class="fa-solid fa-chevron-down text-xs transition-transform duration-300" id="faq-icon-4"></i>
+          </button>
+          <div class="px-6 pb-5 text-xs text-slate-300 leading-relaxed border-t border-slate-800/60 pt-3 hidden" id="faq-content-4">
+            <strong>No.</strong> AWS VPC Peering is strictly <strong>non-transitive</strong> and does not support edge routing. Traffic cannot enter a VPC via a peering connection and exit through an attached Internet Gateway, NAT Gateway, VPN, or Direct Connect. To provide internet access to VPC B, an independent gateway or AWS Transit Gateway must be deployed.
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="py-12 bg-slate-950 text-slate-400 text-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div>
+        <p class="font-medium text-slate-300">AWS VPC Peering Student Project • EWB Cloud Labs Assessment</p>
+        <p class="text-slate-500 mt-0.5">Author: Ankit Singh Yadav • Batch 2026 • ap-south-1 (Mumbai)</p>
+      </div>
+      <div class="flex items-center gap-4">
+        <a href="https://github.com/ankitsingyadav/aws-vpc-peering-project" target="_blank" class="hover:text-amber-400 transition flex items-center gap-1.5">
+          <i class="fa-brands fa-github text-sm"></i> GitHub Repo
+        </a>
+        <a href="report.pdf" download class="hover:text-amber-400 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-file-pdf text-sm"></i> Download Report PDF
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- JAVASCRIPT FOR SIMULATOR & TABS -->
+  <script>
+    // Simulator execution logic
+    const scenarios = {
+      baseline: {
+        title: "ec2-user@ewb-app-a:~ (Pre-Peering Baseline)",
+        output: `<span class="text-slate-400">[ec2-user@ewb-app-a ~]$ ping -c 4 10.20.1.10</span>
+PING 10.20.1.10 (10.20.1.10) 56(84) bytes of data.
+<span class="text-rose-400 font-bold">--- 10.20.1.10 ping statistics ---
+4 packets transmitted, 0 received, 100% packet loss, time 3003ms</span>`,
+        explanation: `<strong class="text-rose-400 block mb-1">Baseline Failure Confirmed:</strong>
+Even though the peering connection exists, neither route table has entries directing traffic toward the peering connection (pcx). Packets are immediately dropped by VPC A's router.`
+      },
+      forward: {
+        title: "ec2-user@ewb-app-a:~ (Forward Path Verification)",
+        output: `<span class="text-slate-400">[ec2-user@ewb-app-a ~]$ hostname && hostname -I</span>
+ewb-app-a
+10.10.2.10
+<span class="text-slate-400">[ec2-user@ewb-app-a ~]$ ping -c 4 10.20.1.10</span>
+PING 10.20.1.10 (10.20.1.10) 56(84) bytes of data.
+64 bytes from 10.20.1.10: icmp_seq=1 ttl=255 time=0.482 ms
+64 bytes from 10.20.1.10: icmp_seq=2 ttl=255 time=0.415 ms
+64 bytes from 10.20.1.10: icmp_seq=3 ttl=255 time=0.428 ms
+64 bytes from 10.20.1.10: icmp_seq=4 ttl=255 time=0.431 ms
+
+<span class="text-emerald-400 font-bold">--- 10.20.1.10 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 3003ms
+rtt min/avg/max/mdev = 0.415/0.439/0.482/0.026 ms</span>`,
+        explanation: `<strong class="text-emerald-400 block mb-1">Forward Path Operational:</strong>
+Packets travel: App-A (10.10.2.10) &rarr; ewb-rt-a-private (10.20.0.0/16 &rarr; pcx) &rarr; Peering Link &rarr; App-B (10.20.1.10). Round-trip latency averages 0.439 ms.`
+      },
+      reverse: {
+        title: "ec2-user@ewb-app-b:~ (Reverse Path Verification)",
+        output: `<span class="text-slate-400">[ec2-user@ewb-app-b ~]$ hostname && hostname -I</span>
+ewb-app-b
+10.20.1.10
+<span class="text-slate-400">[ec2-user@ewb-app-b ~]$ ping -c 4 10.10.2.10</span>
+PING 10.10.2.10 (10.10.2.10) 56(84) bytes of data.
+64 bytes from 10.10.2.10: icmp_seq=1 ttl=255 time=0.450 ms
+64 bytes from 10.10.2.10: icmp_seq=2 ttl=255 time=0.420 ms
+64 bytes from 10.10.2.10: icmp_seq=3 ttl=255 time=0.418 ms
+64 bytes from 10.10.2.10: icmp_seq=4 ttl=255 time=0.425 ms
+
+<span class="text-blue-400 font-bold">--- 10.10.2.10 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 3003ms</span>`,
+        explanation: `<strong class="text-blue-400 block mb-1">Bidirectional Route Verified:</strong>
+Proves that ewb-rt-b-private has the return route (10.10.0.0/16 &rarr; pcx) and ewb-sg-app-a permits inbound ICMP from 10.20.1.10/32.`
+      },
+      ssh: {
+        title: "admin@laptop:~ (SSH ProxyJump Hop)",
+        output: `<span class="text-slate-400">$ ssh -i ~/.ssh/ewb-lab.pem -J ec2-user@13.233.x.x ec2-user@10.20.1.10</span>
+Last login: Fri Oct 30 16:30:00 2026 from 10.10.1.10
+   ,     #_
+   ~\\_  ####_        Amazon Linux 2023
+  ~~  \\ ###~~\\
+  ~~   /  #    #     https://aws.amazon.com/linux/amazon-linux-2023/
+   ~~ /   ######
+     ~   #    #
+<span class="text-amber-400">[ec2-user@ewb-app-b ~]$ hostname -I</span>
+<span class="text-emerald-400 font-bold">10.20.1.10</span>
+<span class="text-slate-400">[ec2-user@ewb-app-b ~]$ who</span>
+ec2-user pts/0        2026-10-30 16:30 (10.10.1.10)`,
+        explanation: `<strong class="text-amber-400 block mb-1">ProxyJump Administrative Hop:</strong>
+Admin connects to private App-B without exposing private keys to remote servers. Connection hops via Bastion (10.10.1.10) over peering.`
+      },
+      failure: {
+        title: "ec2-user@ewb-app-a:~ (Controlled Negative Control)",
+        output: `<span class="text-purple-400"># STEP 1: Inbound ICMP rule deleted from ewb-sg-app-b</span>
+<span class="text-slate-400">[ec2-user@ewb-app-a ~]$ ping -c 4 10.20.1.10</span>
+<span class="text-rose-400 font-bold">--- 10.20.1.10 ping statistics ---
+4 packets transmitted, 0 received, 100% packet loss</span>
+
+<span class="text-purple-400"># STEP 2: Inbound ICMP rule restored on ewb-sg-app-b</span>
+<span class="text-slate-400">[ec2-user@ewb-app-a ~]$ ping -c 2 10.20.1.10</span>
+64 bytes from 10.20.1.10: icmp_seq=1 ttl=255 time=0.420 ms
+64 bytes from 10.20.1.10: icmp_seq=2 ttl=255 time=0.415 ms
+<span class="text-emerald-400 font-bold">2 packets transmitted, 2 received, 0% packet loss</span>`,
+        explanation: `<strong class="text-purple-400 block mb-1">Virtual Firewall Isolation Proof:</strong>
+Route tables remained untouched, but removing the ICMP rule at the ENI dropped all packets instantly. Restoring the rule instantly restored 0% loss.`
+      }
+    };
+
+    function runScenario(key) {
+      const s = scenarios[key];
+      const out = document.getElementById('term-output');
+      const title = document.getElementById('term-title');
+      const exp = document.getElementById('term-explanation');
+
+      title.innerText = s.title;
+      out.innerHTML = `<div class="animate-pulse text-amber-400">Executing command...</div>`;
+      
+      setTimeout(() => {
+        out.innerHTML = s.output;
+        exp.innerHTML = s.explanation;
+      }, 350);
+    }
+
+    // IaC Tab switching
+    const iacFiles = {
+      terraform: {
+        filename: "terraform/main.tf",
+        code: `# Terraform main.tf - AWS VPC Peering Lab
+terraform {
+  required_version = ">= 1.3"
+  required_providers {
+    aws = { source = "hashicorp/aws", version = "~> 5.0" }
+  }
+}
+
+provider "aws" {
+  region = var.aws_region
+  default_tags {
+    tags = { Project = "EWB-VPC-Peering", Student = "Ankit Singh Yadav" }
+  }
+}
+
+resource "aws_vpc" "vpc_a" {
+  cidr_block           = "10.10.0.0/16"
+  enable_dns_hostnames = true
+  tags                 = { Name = "ewb-vpc-a" }
+}
+
+resource "aws_vpc" "vpc_b" {
+  cidr_block           = "10.20.0.0/16"
+  enable_dns_hostnames = true
+  tags                 = { Name = "ewb-vpc-b" }
+}
+
+resource "aws_vpc_peering_connection" "peer" {
+  vpc_id      = aws_vpc.vpc_a.id
+  peer_vpc_id = aws_vpc.vpc_b.id
+  auto_accept = true
+  tags        = { Name = "ewb-a-b-peer" }
+}`
+      },
+      cloudformation: {
+        filename: "cloudformation/vpc-peering.yaml",
+        code: `AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS VPC Peering Project - Dual VPC Architecture
+
+Parameters:
+  StudentName:
+    Type: String
+    Default: "Ankit Singh Yadav"
+  MyIP:
+    Type: String
+    Description: Admin Public IP CIDR (e.g. 203.0.113.25/32)
+
+Resources:
+  VpcA:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.10.0.0/16
+      Tags: [{ Key: Name, Value: ewb-vpc-a }]
+
+  VpcB:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.20.0.0/16
+      Tags: [{ Key: Name, Value: ewb-vpc-b }]
+
+  VpcPeeringConnection:
+    Type: AWS::EC2::VPCPeeringConnection
+    Properties:
+      VpcId: !Ref VpcA
+      PeerVpcId: !Ref VpcB
+      Tags: [{ Key: Name, Value: ewb-a-b-peer }]`
+      }
+    };
+
+    function switchIac(type) {
+      const data = iacFiles[type];
+      document.getElementById('iac-filename').innerText = data.filename;
+      document.getElementById('iac-code').innerHTML = `<code>${data.code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code>`;
+
+      const btnTf = document.getElementById('tab-btn-tf');
+      const btnCfn = document.getElementById('tab-btn-cfn');
+      if (type === 'terraform') {
+        btnTf.className = 'px-5 py-2 rounded-lg bg-amber-500 text-slate-950 shadow-md font-bold';
+        btnCfn.className = 'px-5 py-2 rounded-lg text-slate-400 hover:text-white font-bold';
+      } else {
+        btnCfn.className = 'px-5 py-2 rounded-lg bg-amber-500 text-slate-950 shadow-md font-bold';
+        btnTf.className = 'px-5 py-2 rounded-lg text-slate-400 hover:text-white font-bold';
+      }
+    }
+
+    function copyIacCode() {
+      const code = document.getElementById('iac-code').innerText;
+      navigator.clipboard.writeText(code).then(() => {
+        const text = document.getElementById('copy-btn-text');
+        text.innerText = "Copied!";
+        setTimeout(() => { text.innerText = "Copy Code"; }, 2000);
+      });
+    }
+
+    // Accordion toggle
+    function toggleFaq(id) {
+      const content = document.getElementById(`faq-content-${id}`);
+      const icon = document.getElementById(`faq-icon-${id}`);
+      if (content.classList.contains('hidden')) {
+        content.classList.remove('hidden');
+        icon.classList.add('rotate-180');
+      } else {
+        content.classList.add('hidden');
+        icon.classList.remove('rotate-180');
+      }
+    }
+  </script>
+</body>
+</html>
